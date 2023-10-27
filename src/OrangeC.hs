@@ -1,23 +1,14 @@
-{-# language QuasiQuotes #-}
-
 module OrangeC
     ( compile
     ) where
 
-import Data.ByteString
-import Data.ByteString.Char8 as B8
-import Text.RawString.QQ
+import Data.Text
 
-compile :: ByteString -> ByteString
-compile _ = B8.pack [r|
-	.text
-	.global main
-	.type  main, @function
-	.p2align 4
+import qualified Codegen as Gen
+import Parse
 
-main:
-	movl $2, %eax
-	ret
-
-	.section .note.GNU-stack,"",@progbits
-|]
+compile :: FilePath -> Text -> Either String Text
+compile file src = do
+  ast <- parse file src
+  let asm = Gen.asm ast
+  Right $ Gen.prelude "main" asm

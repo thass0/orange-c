@@ -21,12 +21,13 @@ description:         Please see the README on GitHub at <https://github.com/d4ck
 default-extensions:
   - StrictData
   - OverloadedStrings
+  - QuasiQuotes
 
 dependencies:
 - base >= 4.7 && < 5
 - record-hasfield
 - megaparsec
-- bytestring
+- text
 - raw-strings-qq
 - directory
 
