@@ -1,0 +1,70 @@
+name:                orange-c
+version:             0.1.0.0
+github:              "d4ckard/orange-c"
+license:             MIT
+author:              "Thassilo Schulze"
+maintainer:          "d4kd@proton.me"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            compiler
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/d4ckard/orange-c#readme>
+
+default-extensions:
+  - StrictData
+  - OverloadedStrings
+
+dependencies:
+- base >= 4.7 && < 5
+- record-hasfield
+- megaparsec
+- bytestring
+- raw-strings-qq
+- directory
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wmissing-export-lists
+  - -Wmissing-home-modules
+  - -Wpartial-fields
+  - -Wredundant-constraints
+  - -F -pgmF=record-dot-preprocessor
+library:
+  source-dirs: src
+
+executables:
+  orange-c-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - orange-c
+
+tests:
+  orange-c-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - orange-c
+    - typed-process
+    - hspec
+    - hspec-discover
