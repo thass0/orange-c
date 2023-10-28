@@ -30,6 +30,7 @@ dependencies:
 - text
 - raw-strings-qq
 - directory
+- parser-combinators
 
 ghc-options:
   - -Wall

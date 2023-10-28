@@ -24,6 +24,7 @@ source-repository head
 
 library
   exposed-modules:
+      Ast
       Codegen
       OrangeC
       Parse
@@ -40,6 +41,7 @@ library
       base >=4.7 && <5
     , directory
     , megaparsec
+    , parser-combinators
     , raw-strings-qq
     , record-hasfield
     , text
@@ -61,6 +63,7 @@ executable orange-c-exe
     , directory
     , megaparsec
     , orange-c
+    , parser-combinators
     , raw-strings-qq
     , record-hasfield
     , text
@@ -71,6 +74,7 @@ test-suite orange-c-test
   main-is: Spec.hs
   other-modules:
       CodegenSpec
+      ParseSpec
       TranslationSpec
       Paths_orange_c
   hs-source-dirs:
@@ -87,6 +91,7 @@ test-suite orange-c-test
     , hspec-discover
     , megaparsec
     , orange-c
+    , parser-combinators
     , raw-strings-qq
     , record-hasfield
     , text

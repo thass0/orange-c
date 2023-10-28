@@ -1,10 +1,15 @@
-module Codegen (asm, prelude, Asm) where
+module Codegen
+  (asm
+  , prelude
+  , Asm
+  , GenAsm (..)
+  ) where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty ((<|))
 import qualified Data.Text as T
 
-import Parse
+import Ast
 
 -- | A piece of assembly code.
 type Asm = T.Text
@@ -34,19 +39,39 @@ class GenAsm a where
 -- * Assembly generation for AST nodes.
 
 instance GenAsm Program where
-  genAsm (Program functions) =
-    -- NonEmpty.fromList (concat (map NonEmpty.toList (map genAsm (NonEmpty.toList functions))))
-    functions >>= genAsm
+  genAsm (Program functions) = functions >>= genAsm
 
 instance GenAsm Function where
   genAsm (Function ident statements) =
-    -- (id <> ":") `NonEmpty.cons` (NonEmpty.fromList (concat (map NonEmpty.toList (map genAsm (NonEmpty.toList statements)))))
     (ident <> ":") <| (statements >>= genAsm)
 
 instance GenAsm Statement where
-  genAsm (Return expression) =
-    genAsm expression <> (NonEmpty.singleton $ T.pack "\tret")
+  genAsm (Return expr) =
+    genAsm expr <> instr "ret"
 
 instance GenAsm Expression where
-  genAsm (Constant i) = NonEmpty.singleton $ T.pack $
-    "\tmovl $" <> show i <> ", %eax"
+  genAsm thisExpr = case thisExpr of
+    (Constant i) -> instr $ "movl " <> asmLit i <> ", %eax"
+    (Negate expr) -> genAsm expr <> instr "neg %eax"
+    (LogicNot expr) -> genAsm expr <> instrs [ "cmpl $0, %eax"
+                                             , "sete %al"
+                                             , "movzbl %al, %eax"
+                                             ]
+    (BitNot expr) -> genAsm expr <> instr "notl %eax"
+
+
+-- * Helpers
+
+-- | Wrap a single instruction in a non-empty singleton.
+--   Indents the instruction with a single tab.
+instr :: Asm -> NonEmpty.NonEmpty Asm
+instr = NonEmpty.singleton . T.cons '\t'
+
+-- | Wrap a list of instructions in a non-empty list.
+--   Indents the instructions with a single tab each.
+instrs :: [Asm] -> NonEmpty.NonEmpty Asm
+instrs = NonEmpty.fromList . map (T.cons '\t')
+
+-- | Show as a GAS assembly literal.
+asmLit :: Int -> Asm
+asmLit = T.pack . ('$' :) . show

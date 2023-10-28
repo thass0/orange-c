@@ -1,12 +1,15 @@
 module Parse
-  ( Ast
-  , Program (..)
-  , Function (..)
-  , Ident
-  , Statement (..)
-  , Expression (..)
-  , Parse.parse
-  ) where
+  ( Parse.parse
+  , Parser
+  , pIdent
+  , pInteger
+  , pUnaryOp
+  , pExpr
+  , pStatement
+  , pStatements
+  , pProgram
+  )
+where
 
 import Data.List.NonEmpty
 import Control.Monad
@@ -15,29 +18,12 @@ import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer as L
 import Data.Void
-import Data.Text hiding (singleton)
+import Data.Text hiding (singleton, foldr1)
 
-type Ast = Program
-
-data Program = Program (NonEmpty Function)
-  deriving (Show, Eq)
--- There is no distinction here between a function
--- declaration and its definition. This distinction
--- purely made while parsing and is not reflected in
--- the AST.
-data Function = Function Ident (NonEmpty Statement)
-  deriving (Show, Eq)
-
-type Ident = Text
-
-data Statement = Return Expression
-  deriving (Show, Eq)
-
-data Expression = Constant Int
-  deriving (Show, Eq)
+import Ast
 
 parse :: FilePath -> Text -> Either String Ast
-parse file src = case runParser pMain file src of
+parse file src = case runParser pProgram file src of
   Left err -> Left $ errorBundlePretty err
   Right ast -> Right ast
 
@@ -53,6 +39,14 @@ spaceConsumer = L.space
 -- | Consume the given token of text and trailing whitespace.
 symbol :: Text -> Parser Text
 symbol = L.symbol spaceConsumer
+
+-- | Consume the given token of text and the required trailing whitespace.
+symbol' ::  Text -> Parser Text
+symbol' s= do
+  void (string s)
+  -- Mandates whitespace but removes comments, too.
+  Parse.lexeme space1
+  pure s
 
 -- | Run the given parser and consume trailing whitespace.
 lexeme :: Parser a -> Parser a
@@ -73,28 +67,46 @@ pIdent =
   where
     ident = (:) <$> (letterChar <|> char '_')
             <*> many (alphaNumChar <|> char '_')
+            <?> "identifier"
 
 -- | Parse an integer constant.
-pInteger :: Parser Int
-pInteger = Parse.lexeme L.decimal
+pInteger :: Parser Expression
+pInteger = Constant <$> Parse.lexeme L.decimal
+
+-- | Parse a unary operator that expects to receive another expression.
+pUnaryOp :: Parser (Expression -> Expression)
+pUnaryOp = choice
+  [ Negate <$ Parse.symbol "-"
+  , LogicNot <$ Parse.symbol "!"
+  , BitNot <$ Parse.symbol "~"
+  ]
+
+-- | Parse an expression.
+pExpr :: Parser Expression
+pExpr = pUnaryOp `expects` pExpr <|> pInteger
+
+-- | Complete the output of the first parser with that
+--   of the second.
+expects :: Parser (a -> a) -> Parser a -> Parser a
+a `expects` b = ($) <$> a <*> b
 
 -- | Parse a single statement.
 pStatement :: Parser Statement
 pStatement = do
-  void $ Parse.symbol "return"
-  i <- pInteger
+  void $ Parse.symbol' "return"
+  expr <- pExpr
   void $ Parse.symbol ";"
-  pure $ Return (Constant i)
+  pure $ Return expr
 
 -- | Parse one or more statements.
 pStatements :: Parser (NonEmpty Statement)
 pStatements = fromList <$> some pStatement
 
 -- | Parse the main function.
-pMain :: Parser Ast
-pMain = do
+pProgram :: Parser Ast
+pProgram = do
   void Text.Megaparsec.Char.space
-  void $ Parse.symbol "int"
+  void $ Parse.symbol' "int"
   ident <- pIdent
   void $ inParens (Parse.symbol "void")
   statements <- inBraces pStatements

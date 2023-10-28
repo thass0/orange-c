@@ -21,9 +21,28 @@ simple = do
     it "main function" $ do
       exitCode <- compileAndRun simpleMainFunctionSample
       exitCode `shouldBe` 2
-
+    -- NOTE: The exit codes are returned as unsigned 8 bit numbers.
+    -- Thus, -6 becomes 250, or ~4 becomes 251.
+    it "negated main function" $ do
+      exitCode <- compileAndRun negatedMainFunctionSample
+      exitCode `shouldBe` 250
+    it "logically negated main function (false)" $ do
+      exitCode <- compileAndRun logicalNegatedMainFunctionSampleFalse
+      exitCode `shouldBe` 0
+    it "logically negated main function (true)" $ do
+      exitCode <- compileAndRun logicalNegatedMainFunctionSampleTrue
+      exitCode `shouldBe` 1
+    it "bit-wise negated main function" $ do
+      exitCode <- compileAndRun bitwiseNegatedMainFunctionSample
+      exitCode `shouldBe` 251
+    it "combined unary operators" $ do
+      exitCode <- compileAndRun unaryOperatorsMainFunctionSample
+      exitCode `shouldBe` 2
 
 -- * Samples
+
+-- NOTE: Sometimes the samples are formatted weirdly. The
+-- only purpose of this formatting is to test the parser.
 
 simpleMainFunctionSample :: String
 simpleMainFunctionSample = [r|
@@ -32,6 +51,50 @@ int main(void) {
 }
 |]
 
+negatedMainFunctionSample :: String
+negatedMainFunctionSample = [r|
+int main(void){return -6;}
+|]
+
+logicalNegatedMainFunctionSampleFalse :: String
+logicalNegatedMainFunctionSampleFalse = [r|
+  int
+
+main   (   void
+  )
+     {
+return     !
+  6
+
+;
+
+}
+|]
+  
+logicalNegatedMainFunctionSampleTrue :: String
+logicalNegatedMainFunctionSampleTrue = [r|
+int main(void) {
+  return !0;
+}
+|]
+
+bitwiseNegatedMainFunctionSample :: String
+bitwiseNegatedMainFunctionSample = [r|
+int main(void) {
+  return ~4;
+}
+|]
+
+unaryOperatorsMainFunctionSample :: String
+unaryOperatorsMainFunctionSample = [r|
+int main () {
+  return
+  -   // -> 2
+  ~   // -> -2, or 0b111[...]111110
+  !   // -> 1
+  0;  // -> 0
+}
+|]
 
 -- * Helpers
 
