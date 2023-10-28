@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+read -r -d '' usage <<EOF
+The orange C compiler
+
+usage: orange-c [-o OUT-FILE] IN-FILE [-h] [-v]
+
+  -o OUT-FILE  The file to compile into.
+  IN-FILE      The source file to compile.
+  -h           Print this help message.
+  -v           Print the version number of this program.
+EOF
+
+outfile=""
+
+while getopts "o:hv" opt; do
+    case "$opt" in
+	o)
+	    outfile="$OPTARG"
+	    ;;
+	h)
+	    print_help=true
+	    ;;
+	v)
+	    print_version=true
+	    ;;
+	\?)
+	    echo "$usage"
+	    exit 1
+	    ;;
+    esac
+done
+
+# Print help or version strings.
+if [ "$print_help" = true ]; then
+    echo "$usage"
+    exit 1
+fi
+
+if [ "$print_version" = true ]; then
+    echo "orange-c 0.1.0.0"
+    exit 0
+fi
+
+# Get the input file
+shift $((OPTIND -1))
+
+if [ $# -ne 1 ]; then
+    echo "$usage"
+    exit 1
+fi
+
+infile="$1"
+
+# If the output filename is missing the input filename
+# with the extension removed is used.
+if [ -z "$outfile" ]; then
+    outfile="${infile%.*}"
+fi
+
+if [ ! -x "$(command -v orange-c-exe)" ]; then
+    >&2 echo "orange-c-exe is not in PATH. Install it using stack install."
+    exit 1
+fi
+
+compiled=$(orange-c-exe "$infile" < "$infile")
+if [ $? -ne 0 ]; then
+    >&2 echo "$compiled"
+    exit 1
+fi
+
+gcc -x assembler -o "$outfile" - <<< "$compiled"

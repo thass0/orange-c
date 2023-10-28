@@ -108,6 +108,6 @@ pProgram = do
   void Text.Megaparsec.Char.space
   void $ Parse.symbol' "int"
   ident <- pIdent
-  void $ inParens (Parse.symbol "void")
+  void $ inParens (optional (Parse.symbol "void"))
   statements <- inBraces pStatements
   pure $ Program (singleton (Function ident statements))
