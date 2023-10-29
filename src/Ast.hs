@@ -30,5 +30,9 @@ data Expression
   = Negate Expression  -- ^ Unary arithmetic negation (-)
   | LogicNot Expression  -- ^ Unary logical negation (!)
   | BitNot Expression  -- ^ Unary bit-wise negation (~)
+  | Add Expression Expression  -- ^ Addition (+)
+  | Sub Expression Expression  -- ^ Subtraction (-)
+  | Mul Expression Expression  -- ^ Multiplication (*)
+  | Div Expression Expression  -- ^ Division (/)
   | Constant Int  -- ^ Integer constant.
   deriving (Show, Eq)

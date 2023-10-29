@@ -38,6 +38,12 @@ simple = do
     it "combined unary operators" $ do
       exitCode <- compileAndRun unaryOperatorsMainFunctionSample
       exitCode `shouldBe` 2
+    it "binary expressions" $ do
+      exitCode <- compileAndRun binaryExpressionMainFunctionSample
+      exitCode `shouldBe` 10
+    it "negative division" $ do
+      exitCode <- compileAndRun negativeDivisionMainFunctionSample
+      exitCode `shouldBe` 254
 
 -- * Samples
 
@@ -93,6 +99,20 @@ int main () {
   ~   // -> -2, or 0b111[...]111110
   !   // -> 1
   0;  // -> 0
+}
+|]
+
+binaryExpressionMainFunctionSample :: String
+binaryExpressionMainFunctionSample = [r|
+int main() {
+  return 18 / 9 * 6 + (2 - ~~4);
+}
+|]
+
+negativeDivisionMainFunctionSample :: String
+negativeDivisionMainFunctionSample = [r|
+int main(void) {
+  return (-12) / 5;
 }
 |]
 

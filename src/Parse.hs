@@ -3,7 +3,9 @@ module Parse
   , Parser
   , pIdent
   , pInteger
-  , pUnaryOp
+  , pUnary
+  , pFactor
+  , pTerm
   , pExpr
   , pStatement
   , pStatements
@@ -18,7 +20,8 @@ import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer as L
 import Data.Void
-import Data.Text hiding (singleton, foldr1)
+import Data.Text hiding (singleton, foldr1, foldl)
+import Data.Functor (($>))
 
 import Ast
 
@@ -74,21 +77,46 @@ pInteger :: Parser Expression
 pInteger = Constant <$> Parse.lexeme L.decimal
 
 -- | Parse a unary operator that expects to receive another expression.
-pUnaryOp :: Parser (Expression -> Expression)
-pUnaryOp = choice
-  [ Negate <$ Parse.symbol "-"
-  , LogicNot <$ Parse.symbol "!"
-  , BitNot <$ Parse.symbol "~"
+pUnary :: Parser (Expression -> Expression)
+pUnary = choice
+  [ Parse.symbol "-" $> Negate
+  , Parse.symbol "!" $> LogicNot
+  , Parse.symbol "~" $> BitNot
   ]
 
--- | Parse an expression.
-pExpr :: Parser Expression
-pExpr = pUnaryOp `expects` pExpr <|> pInteger
+-- | Parse a factor in a term.
+--   <factor> -> "(" <expr> ")" | <unary> <factor> | <constant>
+pFactor :: Parser Expression
+pFactor = choice
+  [ inParens pExpr
+  , pUnary <*> pFactor
+  , pInteger
+  ]
 
--- | Complete the output of the first parser with that
---   of the second.
-expects :: Parser (a -> a) -> Parser a -> Parser a
-a `expects` b = ($) <$> a <*> b
+-- | Parse a term in an expression.
+--   <term> -> <factor { ("*" | "/") <factor }
+pTerm :: Parser Expression
+pTerm = do
+  lhs <- pFactor
+  rhs <- many $ (pMul <|> pDiv) <*> pFactor
+  pure $ foldl (\expr op -> op expr) lhs rhs
+  where
+    pMul = Parse.symbol "*" $> flip Mul
+    pDiv = Parse.symbol "/" $> flip Div
+
+-- | Parse an expression.
+--   <expr> -> <term> { ("+" | "-") <term> }
+pExpr :: Parser Expression
+pExpr = do
+  lhs <- pTerm
+  rhs <- many $ (pAdd <|> pSub) <*> pTerm
+  pure $ foldl (\expr op -> op expr) lhs rhs
+  where
+    -- `flip` is needed to order the operands correctly,
+    -- since the first term that's applied to `pAdd` or
+    -- `pSub` is the right hand side of the operation.
+    pAdd = Parse.symbol "+" $> flip Add
+    pSub = Parse.symbol "-" $> flip Sub
 
 -- | Parse a single statement.
 pStatement :: Parser Statement
