@@ -34,5 +34,7 @@ data Expression
   | Sub Expression Expression  -- ^ Subtraction (-)
   | Mul Expression Expression  -- ^ Multiplication (*)
   | Div Expression Expression  -- ^ Division (/)
+  | LogicAnd Expression Expression  -- ^ Logical AND (&&)
+  | LogicOr Expression Expression  -- ^ Logical OR (||)
   | Constant Int  -- ^ Integer constant.
   deriving (Show, Eq)

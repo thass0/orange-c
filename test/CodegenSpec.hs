@@ -3,8 +3,9 @@ module CodegenSpec (spec) where
 import Test.Hspec
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty
+import qualified Data.Text as T
 
-import qualified Codegen
+import Codegen
 import Ast
 
 spec :: Spec
@@ -18,67 +19,105 @@ expressions :: Spec
 expressions = do
   describe "statements" $ do
     it "arithmetic negation" $
-      genAsmL (Negate (Constant 9))
+      asm (Negate (Constant 9))
       `shouldBe`
-      [ "\tpushq $9"
-      , "\tpopq %rax"
-      , "\tneg %eax"
-      , "\tpushq %rax"
-      ]
+      (T.unlines $ fInstrs
+      [ "pushq $9"
+      , "popq %rax"
+      , "neg %eax"
+      , "pushq %rax"
+      ])
 
     it "logical negation" $
-      genAsmL (LogicNot (Constant 94))
+      asm (LogicNot (Constant 94))
       `shouldBe`
-      [ "\tpushq $94"
-      , "\tpopq %rax"
-      , "\tcmpl $0, %eax"
-      , "\tsete %al"
-      , "\tmovzbl %al, %eax"
-      , "\tpushq %rax"
-      ]
+      (T.unlines $ fInstrs
+      [ "pushq $94"
+      , "popq %rax"
+      , "cmpl $0, %eax"
+      , "sete %al"
+      , "movzbl %al, %eax"
+      , "pushq %rax"
+      ])
 
     it "bit-wise negation" $
-      genAsmL (BitNot (Constant 42))
+      asm (BitNot (Constant 42))
       `shouldBe`
-      [ "\tpushq $42"  -- Constant 42
-      , "\tpopq %rax"  -- Start of not
-      , "\tnotl %eax"
-      , "\tpushq %rax"  -- End of not
-      ]
+      (T.unlines $ fInstrs
+      [ "pushq $42"  -- Constant 42
+      , "popq %rax"  -- Start of not
+      , "notl %eax"
+      , "pushq %rax"  -- End of not
+      ])
     it "addition" $
-      genAsmL (Add (Constant 4) (Constant 5))
+      asm (Add (Constant 4) (Constant 5))
       `shouldBe`
-      [ "\tpushq $4"  -- Constant 4
-      , "\tpushq $5"  -- Constant 5
-      , "\tpopq %rdx"  -- Start of addition
-      , "\tpopq %rax"
-      , "\taddl %edx, %eax"  -- eax <- eax +  edx
-      , "\tpushq %rax"  -- End of addition
-      ]
+      (T.unlines $ fInstrs
+      [ "pushq $4"  -- Constant 4
+      , "pushq $5"  -- Constant 5
+      , "popq %rdx"  -- Start of addition
+      , "popq %rax"
+      , "addl %edx, %eax"  -- eax <- eax +  edx
+      , "pushq %rax"  -- End of addition
+      ])
     it "division" $
-      genAsmL (Div (Constant 18) (Constant 9))
+      asm (Div (Constant 18) (Constant 9))
       `shouldBe`
-      [ "\tpushq $18"
-      , "\tpushq $9"
-      , "\tpopq %rbx"
-      , "\tpopq %rax"
-      , "\tcltd"
-      , "\tidivl %ebx"
-      , "\tpushq %rax"
-      ]
-
+      (T.unlines $ fInstrs
+      [ "pushq $18"
+      , "pushq $9"
+      , "popq %rbx"
+      , "popq %rax"
+      , "cltd"
+      , "idivl %ebx"
+      , "pushq %rax"
+      ])
+    it "logical AND and logical OR" $
+      -- Both 5 and 2 are non-zero and thus considered true.
+      asm (LogicOr (LogicAnd (Constant 5) (Constant 2)) (Constant 3))
+      `shouldBe`
+      (T.unlines $ fInstrs
+      -- Start of logical AND
+      [ "pushq $5"  -- Constant 5 (lhs of AND)
+      , "pushq $2"  -- Constant 2 (rhs of AND)
+      , "popq %rdx"
+      , "popq %rax"
+      , "cmpl $0, %eax"
+      , "je .L0"
+      , "cmpl $0, %edx"
+      , "je .L0"
+      , "movl $1, %eax"
+      , "jmp .L1"
+      ] <>
+      fLabel ".L0" <>
+      fInstr "movl $0, %eax" <>
+      fLabel ".L1" <>
+      fInstr "pushq %rax" <>
+      -- End of logical AND (lhs of OR)
+      -- Start of logical OR
+      fInstrs
+      [ "pushq $3"  -- Constant 3 (rhs of OR)
+      , "popq %rdx"
+      , "popq %rax"
+      , "cmpl $0, %eax"
+      , "jne .L2"
+      , "cmpl $0, %edx"
+      , "jne .L2"
+      , "movl $0, %eax"
+      , "jmp .L3"
+      ] <>
+      fLabel ".L2" <>
+      fInstr "movl $1, %eax" <>
+      fLabel ".L3" <>
+      fInstr "pushq %rax")
+      -- End of logical OR
+      
 programs :: Spec
 programs = do
   describe "programs" $ do
     it "main function" $
-      Codegen.asm (Program
+      asm (Program
                    (singleton (Function "main"
                                (singleton (Return (Constant 2))))))
       `shouldBe`
       "main:\n\tpushq $2\n\tpopq %rax\n\tret\n"
-
-
--- * Helpers
-
-genAsmL :: (Codegen.GenAsm a) => a -> [Codegen.Asm]
-genAsmL node = NonEmpty.toList $ Codegen.genAsm node
