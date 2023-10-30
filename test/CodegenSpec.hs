@@ -17,7 +17,7 @@ spec = do
 
 expressions :: Spec
 expressions = do
-  describe "statements" $ do
+  describe "expressions" $ do
     it "arithmetic negation" $
       asm (Negate (Constant 9))
       `shouldBe`

@@ -94,29 +94,25 @@ pIdent = Parse.lexeme $ fmap pack ident
 pInteger :: Parser Expression
 pInteger = Constant <$> Parse.lexeme L.decimal
 
--- | Parse a unary operator that expects to receive another expression.
-pUnary :: Parser (Expression -> Expression)
-pUnary = choice
-  [ Parse.symbol "-" $> Negate
-  , Parse.symbol "!" $> LogicNot
-  , Parse.symbol "~" $> BitNot
-  ]
+-- | <unary> -> ("-" | "!" | "~") <factor>
+pUnary :: Parser Expression
+pUnary = (pNegate <|> pLogicNot <|> pBitNot) <*> pFactor
+  where
+    pNegate = Parse.symbol "-" $> Negate
+    pLogicNot = Parse.symbol "!" $> LogicNot
+    pBitNot = Parse.symbol "~" $> BitNot
 
--- | Parse a factor in a term.
---   <factor> -> "(" <expr> ")" | <unary> <factor> | <constant>
+-- | <factor> -> "(" <expr> ")" | <unary> | <constant>
 pFactor :: Parser Expression
-pFactor = choice
-  [ inParens pExpr
-  , pUnary <*> pFactor
-  , pInteger
-  ]
+pFactor = inParens pExpr <|> pUnary <|> pInteger
 
 -- | <term> -> <factor> { ("*" | "/") <factor> }
 pTerm :: Parser Expression
-pTerm = binExprL pFactor (pMul <|> pDiv)
+pTerm = binExprL pFactor (pMul <|> pDiv <|> pMod)
   where
     pMul = Parse.symbol "*" $> Mul
     pDiv = Parse.symbol "/" $> Div
+    pMod = Parse.symbol "%" $> Mod
 
 -- | <arith-expr> -> <term> { ("+" | "-") <term> }
 pArithExpr :: Parser Expression
@@ -125,9 +121,57 @@ pArithExpr = binExprL pTerm (pAdd <|> pSub)
     pAdd = Parse.symbol "+" $> Add
     pSub = Parse.symbol "-" $> Sub
 
--- | <logic-and-expr> -> <arith-expr> { "&&" <arith-expr> }
+-- | <shift-expr> -> <arith-expr> { ("<<" | ">>") <arith-expr> }
+pShiftExpr :: Parser Expression
+pShiftExpr = binExprL pArithExpr (pLeftShift <|> pRightShift)
+  where
+    pLeftShift = Parse.symbol "<<" $> LeftShift
+    pRightShift = Parse.symbol ">>" $> RightShift
+
+-- | <rel-cmp-expr> ->
+--   <shift-expr> { ("<=" | "<" | ">=" | ">") <shift-expr> }
+pRelCmpExpr :: Parser Expression
+pRelCmpExpr = binExprL pShiftExpr
+  -- Note the ordering here. If `pG` (e.g.) came before
+  -- `pGe`, it would parse the operator `<=` as only a
+  -- `<` leaving behind the `=`.
+  (pLeq <|> pL <|> pGeq <|> pG)
+  where
+    pLeq = Parse.symbol "<=" $> RelLeq
+    pL = Parse.symbol "<" $> RelL
+    pGeq = try (Parse.symbol' ">=") $> RelGeq
+    pG = Parse.symbol ">" $> RelG
+
+-- | <rel-eq-expr> -> <rel-cmp-expr> { ("==" | "!=") <rel-cmp-expr> }
+pRelEqExpr :: Parser Expression
+pRelEqExpr = binExprL pRelCmpExpr (pEq <|> pNeq)
+  where
+    pEq = Parse.symbol "==" $> RelEq
+    pNeq = Parse.symbol "!=" $> RelNeq
+
+-- | <bit-and-expr> -> <rel-eq-expr> { "&" <rel-eq-expr> }
+pBitAndExpr :: Parser Expression
+pBitAndExpr = binExprL pRelEqExpr (pBitAnd $> BitAnd)
+  where
+    -- `&` is a higher-precedence prefix of `&&`.
+    pBitAnd = try (pBitAnd' <* notFollowedBy pBitAnd')
+    pBitAnd' = Parse.symbol "&"
+
+-- | <bit-xor-exp> -> <bit-and-expr> { "^" <bit-and-expr> }
+pBitXorExpr :: Parser Expression
+pBitXorExpr = binExprL pBitAndExpr (Parse.symbol "^" $> BitXor)
+
+-- | <bit-or-expr> -> <bit-xor-expr> { "|" <bit-xor-expr> }
+pBitOrExpr :: Parser Expression
+pBitOrExpr = binExprL pBitXorExpr (pBitOr $> BitOr)
+  where
+    -- `|` is a higher-precedence prefix of `||`.
+    pBitOr = try (pBitOr' <* notFollowedBy pBitOr')
+    pBitOr' = Parse.symbol "|"
+
+-- | <logic-and-expr> -> <bit-or-expr> { "&&" <bit-or-expr> }
 pLogicAndExpr :: Parser Expression
-pLogicAndExpr = binExprL pArithExpr (Parse.symbol "&&" $> LogicAnd)
+pLogicAndExpr = binExprL pBitOrExpr (Parse.symbol "&&" $> LogicAnd)
 
 -- | <logic-or-expr> -> <logic-and-expr> { "||" <logic-and-expr> }
 pLogicOrExpr :: Parser Expression
