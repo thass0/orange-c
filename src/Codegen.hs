@@ -10,7 +10,6 @@ module Codegen
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty ((<|))
 import qualified Data.Text as T
-import qualified Data.Map as Map
 
 import Ast
 
@@ -104,7 +103,7 @@ showText :: Show a => a -> T.Text
 showText = T.pack . show
 
 accAsmText :: AsmTextAcc -> Asm -> AsmTextAcc
-accAsmText acc asm = case asm of
+accAsmText acc asmCode = case asmCode of
   APush i ->
     let text = "\tpushq $" <> showText i <> "\n"
     in acc{ accText = acc.accText <> text }

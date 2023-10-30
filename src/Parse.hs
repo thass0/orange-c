@@ -63,12 +63,30 @@ inParens = between (Parse.symbol "(") (Parse.symbol ")")
 inBraces :: Parser a -> Parser a
 inBraces = between (Parse.symbol "{") (Parse.symbol "}")
 
+-- | Parse a left-associative binary expression.
+binExprL
+  -- | A side of the equation.
+  :: Parser Expression
+  -- | The operator. Returns a function that given both sides of
+  --   the expression will return the final one.
+  -> Parser (Expression -> Expression -> Expression)
+  -> Parser Expression
+binExprL pSide operator = do
+  lhs <- pSide
+  -- The first side that will be applied to the function inside
+  -- the `operator` parser is the right hand side, but because
+  -- the first parameter of the constructor should be the left
+  -- hand side the parameters must be flipped.
+  rhs <- many $ flip <$> operator <*> pSide
+  pure $ foldl (\expr op -> op expr) lhs rhs
+  
+
 -- | Parse an identifier.
 pIdent :: Parser Text
-pIdent =
-  Parse.lexeme $ fmap pack ident
+pIdent = Parse.lexeme $ fmap pack ident
   where
-    ident = (:) <$> (letterChar <|> char '_')
+    ident = (:)
+            <$> (letterChar <|> char '_')
             <*> many (alphaNumChar <|> char '_')
             <?> "identifier"
 
@@ -93,30 +111,31 @@ pFactor = choice
   , pInteger
   ]
 
--- | Parse a term in an expression.
---   <term> -> <factor { ("*" | "/") <factor }
+-- | <term> -> <factor> { ("*" | "/") <factor> }
 pTerm :: Parser Expression
-pTerm = do
-  lhs <- pFactor
-  rhs <- many $ (pMul <|> pDiv) <*> pFactor
-  pure $ foldl (\expr op -> op expr) lhs rhs
+pTerm = binExprL pFactor (pMul <|> pDiv)
   where
-    pMul = Parse.symbol "*" $> flip Mul
-    pDiv = Parse.symbol "/" $> flip Div
+    pMul = Parse.symbol "*" $> Mul
+    pDiv = Parse.symbol "/" $> Div
 
--- | Parse an expression.
---   <expr> -> <term> { ("+" | "-") <term> }
-pExpr :: Parser Expression
-pExpr = do
-  lhs <- pTerm
-  rhs <- many $ (pAdd <|> pSub) <*> pTerm
-  pure $ foldl (\expr op -> op expr) lhs rhs
+-- | <arith-expr> -> <term> { ("+" | "-") <term> }
+pArithExpr :: Parser Expression
+pArithExpr = binExprL pTerm (pAdd <|> pSub)
   where
-    -- `flip` is needed to order the operands correctly,
-    -- since the first term that's applied to `pAdd` or
-    -- `pSub` is the right hand side of the operation.
-    pAdd = Parse.symbol "+" $> flip Add
-    pSub = Parse.symbol "-" $> flip Sub
+    pAdd = Parse.symbol "+" $> Add
+    pSub = Parse.symbol "-" $> Sub
+
+-- | <logic-and-expr> -> <arith-expr> { "&&" <arith-expr> }
+pLogicAndExpr :: Parser Expression
+pLogicAndExpr = binExprL pArithExpr (Parse.symbol "&&" $> LogicAnd)
+
+-- | <logic-or-expr> -> <logic-and-expr> { "||" <logic-and-expr> }
+pLogicOrExpr :: Parser Expression
+pLogicOrExpr = binExprL pLogicAndExpr (Parse.symbol "||" $> LogicOr)
+
+-- | <expr> -> <logic-or-expr>
+pExpr :: Parser Expression
+pExpr = pLogicOrExpr
 
 -- | Parse a single statement.
 pStatement :: Parser Statement

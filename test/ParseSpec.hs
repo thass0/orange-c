@@ -48,6 +48,10 @@ expressions = do
       runTestParse pExpr "1 - 2" `shouldBe` Sub (Constant 1) (Constant 2)
       runTestParse pExpr "1 * 2" `shouldBe` Mul (Constant 1) (Constant 2)
       runTestParse pExpr "1 / 2" `shouldBe` Div (Constant 1) (Constant 2)
+      runTestParse pExpr "1 && 2" `shouldBe`
+        LogicAnd (Constant 1) (Constant 2)
+      runTestParse pExpr "1 || 2" `shouldBe`
+        LogicOr (Constant 1) (Constant 2)
     it "chained binary" $ do
       runTestParse pExpr "1 + 2 + 3" `shouldBe`
         Add (Add (Constant 1) (Constant 2)) (Constant 3)
@@ -57,6 +61,10 @@ expressions = do
         Mul (Mul (Constant 1) (Constant 2)) (Constant 3)
       runTestParse pExpr "1 / 2 / 3" `shouldBe`
         Div (Div (Constant 1) (Constant 2)) (Constant 3)
+      runTestParse pExpr "1 && 2 && 3" `shouldBe`
+        LogicAnd (LogicAnd (Constant 1) (Constant 2)) (Constant 3)
+      runTestParse pExpr "1 || 2 || 3" `shouldBe`
+        LogicOr (LogicOr (Constant 1) (Constant 2)) (Constant 3)
     it "mixed binary" $ do
       runTestParse pExpr "1 + 2 * 91" `shouldBe`
         Add (Constant 1) (Mul (Constant 2) (Constant 91))
@@ -67,6 +75,14 @@ expressions = do
         Sub (Mul (Constant 3) (Add (Constant 1) (Constant 4))) (Constant 9)
       runTestParse pExpr "(1 - (71 + 10)) * 4" `shouldBe`
         Mul (Sub (Constant 1) (Add (Constant 71) (Constant 10))) (Constant 4)
+      runTestParse pExpr "1 + 2 * 4 || (8/4) || 7 && 0" `shouldBe`
+        LogicOr
+        (LogicOr
+          (Add
+           (Constant 1)
+           (Mul (Constant 2) (Constant 4)))
+          (Div (Constant 8) (Constant 4)))
+        (LogicAnd (Constant 7) (Constant 0))
     it "mixed expressions" $ do
       runTestParse pExpr "(-3 + !0) / ~~4" `shouldBe`
         Div (Add (Negate (Constant 3)) (LogicNot (Constant 0)))
@@ -76,7 +92,14 @@ expressions = do
         (LogicNot (LogicNot (Constant 52)))
       runTestParse pExpr "9 - -1" `shouldBe`
         Sub (Constant 9) (Negate (Constant 1))
-
+      runTestParse pExpr "~1 + 2 * 4 || (8/-4) || 7 && !0" `shouldBe`
+        LogicOr
+        (LogicOr
+          (Add
+           (BitNot (Constant 1))
+           (Mul (Constant 2) (Constant 4)))
+          (Div (Constant 8) (Negate (Constant 4))))
+        (LogicAnd (Constant 7) (LogicNot (Constant 0)))
 
 -- * Helpers
 

@@ -44,6 +44,9 @@ simple = do
     it "negative division" $ do
       exitCode <- compileAndRun negativeDivisionMainFunctionSample
       exitCode `shouldBe` 254
+    it "logical binary expressions" $ do
+      exitCode <- compileAndRun logicalOperationsMainFunctionSample
+      exitCode `shouldBe` 1
 
 -- * Samples
 
@@ -113,6 +116,13 @@ negativeDivisionMainFunctionSample :: String
 negativeDivisionMainFunctionSample = [r|
 int main(void) {
   return (-12) / 5;
+}
+|]
+
+logicalOperationsMainFunctionSample :: String
+logicalOperationsMainFunctionSample = [r|
+int main(void) {
+  return 6 && (0 || 42) || 0 && 8;
 }
 |]
 
