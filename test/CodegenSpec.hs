@@ -21,49 +21,50 @@ expressions = do
     it "arithmetic negation" $
       asm (Negate (Constant 9))
       `shouldBe`
-      (T.unlines $ fInstrs
+      fInstrs
       [ "pushq $9"
       , "popq %rax"
       , "neg %eax"
       , "pushq %rax"
-      ])
+      ]
 
     it "logical negation" $
       asm (LogicNot (Constant 94))
       `shouldBe`
-      (T.unlines $ fInstrs
+      fInstrs
       [ "pushq $94"
       , "popq %rax"
       , "cmpl $0, %eax"
       , "sete %al"
       , "movzbl %al, %eax"
       , "pushq %rax"
-      ])
+      ]
 
     it "bit-wise negation" $
       asm (BitNot (Constant 42))
       `shouldBe`
-      (T.unlines $ fInstrs
+      fInstrs
       [ "pushq $42"  -- Constant 42
       , "popq %rax"  -- Start of not
       , "notl %eax"
       , "pushq %rax"  -- End of not
-      ])
+      ]
+
     it "addition" $
       asm (Add (Constant 4) (Constant 5))
       `shouldBe`
-      (T.unlines $ fInstrs
+      fInstrs
       [ "pushq $4"  -- Constant 4
       , "pushq $5"  -- Constant 5
       , "popq %rdx"  -- Start of addition
       , "popq %rax"
       , "addl %edx, %eax"  -- eax <- eax +  edx
       , "pushq %rax"  -- End of addition
-      ])
+      ]
     it "division" $
       asm (Div (Constant 18) (Constant 9))
       `shouldBe`
-      (T.unlines $ fInstrs
+      fInstrs
       [ "pushq $18"
       , "pushq $9"
       , "popq %rbx"
@@ -71,12 +72,13 @@ expressions = do
       , "cltd"
       , "idivl %ebx"
       , "pushq %rax"
-      ])
+      ]
+
     it "logical AND and logical OR" $
       -- Both 5 and 2 are non-zero and thus considered true.
       asm (LogicOr (LogicAnd (Constant 5) (Constant 2)) (Constant 3))
       `shouldBe`
-      (T.unlines $ fInstrs
+      (T.unlines $ fInstrs'
       -- Start of logical AND
       [ "pushq $5"  -- Constant 5 (lhs of AND)
       , "pushq $2"  -- Constant 2 (rhs of AND)
@@ -89,13 +91,13 @@ expressions = do
       , "movl $1, %eax"
       , "jmp .L1"
       ] <>
-      fLabel ".L0" <>
+      fLabel' ".L0" <>
       fInstr "movl $0, %eax" <>
-      fLabel ".L1" <>
+      fLabel' ".L1" <>
       fInstr "pushq %rax" <>
       -- End of logical AND (lhs of OR)
       -- Start of logical OR
-      fInstrs
+      fInstrs'
       [ "pushq $3"  -- Constant 3 (rhs of OR)
       , "popq %rdx"
       , "popq %rax"
@@ -106,9 +108,9 @@ expressions = do
       , "movl $0, %eax"
       , "jmp .L3"
       ] <>
-      fLabel ".L2" <>
+      fLabel' ".L2" <>
       fInstr "movl $1, %eax" <>
-      fLabel ".L3" <>
+      fLabel' ".L3" <>
       fInstr "pushq %rax")
       -- End of logical OR
       

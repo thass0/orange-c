@@ -4,7 +4,9 @@ module Codegen
   , GenAsm (..)
   , fInstr
   , fInstrs
+  , fInstrs'
   , fLabel
+  , fLabel'
   ) where
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -19,14 +21,26 @@ data Asm
   = APush Int
   | ARet
   | ANegate
-  | ALogicNot
-  | ABitNot
   | AAdd
   | ASub
   | AMul
   | ADiv
+  | AMod
+  | ALeftShift
+  | ARightShift
   | ALogicAnd
   | ALogicOr
+  | ALogicNot
+  | ABitAnd
+  | ABitOr
+  | ABitNot
+  | ABitXor
+  | ARelEq
+  | ARelNeq
+  | ARelLeq
+  | ARelL
+  | ARelGeq
+  | ARelG
   | ALabel Ident
   deriving (Show, Eq)
 
@@ -69,14 +83,26 @@ instance GenAsm Expression where
   genAsm thisExpr = case thisExpr of
     (Constant i) -> instr $ APush i
     (Negate expr) -> genAsm expr <> instr ANegate
-    (LogicNot expr) -> genAsm expr <> instr ALogicNot
-    (BitNot expr) -> genAsm expr <> instr ABitNot
     (Add lhs rhs) -> genAsm lhs <> genAsm rhs <> instr AAdd
     (Sub lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ASub
     (Mul lhs rhs) -> genAsm lhs <> genAsm rhs <> instr AMul
     (Div lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ADiv
+    (Mod lhs rhs) -> genAsm lhs <> genAsm rhs <> instr AMod
+    (LeftShift lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ALeftShift
+    (RightShift lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ARightShift
     (LogicAnd lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ALogicAnd
     (LogicOr lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ALogicOr
+    (LogicNot expr) -> genAsm expr <> instr ALogicNot
+    (BitAnd lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ABitAnd
+    (BitOr lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ABitOr
+    (BitNot expr) -> genAsm expr <> instr ABitNot
+    (BitXor lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ABitXor
+    (RelEq lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ARelEq
+    (RelNeq lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ARelNeq
+    (RelLeq lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ARelLeq
+    (RelL lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ARelL
+    (RelGeq lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ARelGeq
+    (RelG lhs rhs) -> genAsm lhs <> genAsm rhs <> instr ARelG
 
 instr :: Asm -> NonEmpty.NonEmpty Asm
 instr = NonEmpty.singleton
@@ -104,13 +130,38 @@ showText = T.pack . show
 
 accAsmText :: AsmTextAcc -> Asm -> AsmTextAcc
 accAsmText acc asmCode = case asmCode of
-  APush i ->
-    let text = "\tpushq $" <> showText i <> "\n"
-    in acc{ accText = acc.accText <> text }
+  APush i -> appendText $ "\tpushq $" <> showText i <> "\n"
+  ANegate -> appendText $ fInstrs
+             [ "popq %rax"
+             , "neg %eax"
+             , "pushq %rax" ]
+  ARet -> appendText $ fInstrs
+          [ "popq %rax"
+          , "ret" ]
+  AAdd -> appendText $ fInstrs
+          [ "popq %rdx", "popq %rax"
+          , "addl %edx, %eax"
+          , "pushq %rax" ]
+  ASub -> appendText $ fInstrs
+          [ "popq %rdx", "popq %rax"
+          , "subl %edx, %eax"
+          , "pushq %rax" ]
+  AMul -> appendText $ fInstrs
+          [ "popq %rdx", "popq %rax"
+          , "imull %edx, %eax"
+          , "pushq %rax" ]
+  ADiv -> appendText $ fInstrs
+          [ "popq %rbx", "popq %rax"
+          , "cltd"
+          , "idivl %ebx"
+          , "pushq %rax" ]
+  AMod -> undefined
+  ALeftShift -> undefined
+  ARightShift -> undefined
   ALogicAnd ->
     let (falseLabel, n) = nextLabel acc.accNLabels
         (doneLabel, n') = nextLabel n
-        text = T.unlines $ fInstrs
+        text = T.unlines $ fInstrs'
                [ "popq %rdx"
                , "popq %rax"
                , "cmpl $0, %eax"
@@ -120,15 +171,15 @@ accAsmText acc asmCode = case asmCode of
                , "movl $1, %eax"
                , "jmp " <> doneLabel
                ] <>
-               fLabel falseLabel <>
+               fLabel' falseLabel <>
                fInstr "movl $0, %eax" <>
-               fLabel doneLabel <>
+               fLabel' doneLabel <>
                fInstr "pushq %rax"
     in acc{ accText = acc.accText <> text, accNLabels = n' }
   ALogicOr ->
     let (trueLabel, n) = nextLabel acc.accNLabels
         (doneLabel, n') = nextLabel n
-        text = T.unlines $ fInstrs
+        text = T.unlines $ fInstrs'
                [ "popq %rdx"
                , "popq %rax"
                , "cmpl $0, %eax"
@@ -138,73 +189,50 @@ accAsmText acc asmCode = case asmCode of
                , "movl $0, %eax"
                , "jmp " <> doneLabel
                ] <>
-               fLabel trueLabel <>
+               fLabel' trueLabel <>
                fInstr "movl $1, %eax" <>
-               fLabel doneLabel <>
+               fLabel' doneLabel <>
                fInstr "pushq %rax"
     in acc{ accText = acc.accText <> text, accNLabels = n' }
-  AAdd ->
-    let text = T.unlines $ fInstrs
-               [ "popq %rdx", "popq %rax"
-               , "addl %edx, %eax"
-               , "pushq %rax" ]
-    in acc{ accText = acc.accText <> text }
-  ASub ->
-    let text = T.unlines $ fInstrs
-               [ "popq %rdx", "popq %rax"
-               , "subl %edx, %eax"
-               , "pushq %rax" ]
-    in acc{ accText = acc.accText <> text }
-  AMul ->
-    let text = T.unlines $ fInstrs
-               [ "popq %rdx", "popq %rax"
-               , "imull %edx, %eax"
-               , "pushq %rax" ]
-    in acc{ accText = acc.accText <> text }
-  ADiv ->
-    let text = T.unlines $ fInstrs
-               [ "popq %rbx", "popq %rax"
-               , "cltd"
-               , "idivl %ebx"
-               , "pushq %rax" ]
-    in acc{ accText = acc.accText <> text }
-  ABitNot ->
-    let text = T.unlines $ fInstrs
-               [ "popq %rax"
-               , "notl %eax"
-               , "pushq %rax" ]
-    in acc{ accText = acc.accText <> text }
-  ALogicNot ->
-    let text = T.unlines $ fInstrs
+  ALogicNot -> appendText $ fInstrs
                [ "popq %rax"
                , "cmpl $0, %eax"
                , "sete %al"
                , "movzbl %al, %eax"
                , "pushq %rax" ]
-    in acc{ accText = acc.accText <> text }
-  ANegate ->
-    let text = T.unlines $ fInstrs
-               [ "popq %rax"
-               , "neg %eax"
-               , "pushq %rax" ]
-    in acc{ accText = acc.accText <> text }
-  ARet ->
-    let text = T.unlines $ fInstrs
-               [ "popq %rax"
-               , "ret" ]
-    in acc{ accText = acc.accText <> text }
-  ALabel l ->
-    let text = T.unlines $ fLabel l
-    in acc{ accText = acc.accText <> text }
-
+  ABitAnd -> undefined
+  ABitOr -> undefined
+  ABitNot -> appendText $ fInstrs
+             [ "popq %rax"
+             , "notl %eax"
+             , "pushq %rax" ]
+  ABitXor -> undefined
+  ARelEq -> undefined
+  ARelNeq -> undefined
+  ARelLeq -> undefined
+  ARelL -> undefined
+  ARelGeq -> undefined
+  ARelG -> undefined
+  ALabel l -> appendText $ fLabel l <> "\n"
+  where
+    appendText :: T.Text -> AsmTextAcc
+    appendText newText =
+      acc{ accText = acc.accText <> newText }
 
 -- * Helpers for formatting assembly code.
 
-fInstrs :: [T.Text] -> [T.Text]
-fInstrs = Prelude.map (T.cons '\t')
+fInstrs :: [T.Text] -> T.Text
+fInstrs = T.unlines . fInstrs'
+
+fInstrs' :: [T.Text] -> [T.Text]
+fInstrs' = Prelude.map (T.cons '\t')
 
 fInstr :: T.Text -> [T.Text]
 fInstr t = [T.cons '\t' t]
 
-fLabel :: T.Text -> [T.Text]
-fLabel t = [t <> ":"]
+fLabel :: T.Text -> T.Text
+fLabel = (<> ":")
+
+fLabel' :: T.Text -> [T.Text]
+fLabel' t = [t <> ":"]
+
