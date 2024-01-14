@@ -6,11 +6,11 @@ cabal-version: 1.12
 
 name:           orange-c
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/d4ckard/orange-c#readme>
-homepage:       https://github.com/d4ckard/orange-c#readme
-bug-reports:    https://github.com/d4ckard/orange-c/issues
+description:    Please see the README on GitHub at <https://github.com/thass0/orange-c#readme>
+homepage:       https://github.com/thass0/orange-c#readme
+bug-reports:    https://github.com/thass0/orange-c/issues
 author:         Thassilo Schulze
-maintainer:     d4kd@proton.me
+maintainer:     thassilo.schulze@proton.me
 license:        MIT
 license-file:   LICENSE
 build-type:     Simple
@@ -20,7 +20,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/d4ckard/orange-c
+  location: https://github.com/thass0/orange-c
 
 library
   exposed-modules:
@@ -95,6 +95,7 @@ test-suite orange-c-test
     , megaparsec
     , orange-c
     , parser-combinators
+    , random-strings
     , raw-strings-qq
     , record-hasfield
     , text

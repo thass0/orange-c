@@ -1,9 +1,9 @@
 name:                orange-c
 version:             0.1.0.0
-github:              "d4ckard/orange-c"
+github:              "thass0/orange-c"
 license:             MIT
 author:              "Thassilo Schulze"
-maintainer:          "d4kd@proton.me"
+maintainer:          "thassilo.schulze@proton.me"
 
 extra-source-files:
 - README.md
@@ -16,7 +16,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/d4ckard/orange-c#readme>
+description:         Please see the README on GitHub at <https://github.com/thass0/orange-c#readme>
 
 default-extensions:
   - StrictData
@@ -71,3 +71,4 @@ tests:
     - typed-process
     - hspec
     - hspec-discover
+    - random-strings
